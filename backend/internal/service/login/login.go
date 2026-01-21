@@ -1,4 +1,4 @@
-package service
+package login
 
 import (
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"

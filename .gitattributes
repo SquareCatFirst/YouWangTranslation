@@ -1,0 +1,46 @@
+# ==============================
+# 默认文本文件
+# ==============================
+* text=auto eol=lf
+
+# ==============================
+# Go 语言文件
+# ==============================
+*.go text eol=lf
+
+# ==============================
+# Shell 脚本
+# ==============================
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# ==============================
+# SQL / 配置文件
+# ==============================
+*.sql text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.toml text eol=lf
+
+# ==============================
+# 文本文档
+# ==============================
+*.md text eol=lf
+*.txt text eol=lf
+
+# ==============================
+# 忽略二进制文件换行符
+# ==============================
+*.exe binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+
+# SQL 文件统一 LF
+*.sql text eol=lf

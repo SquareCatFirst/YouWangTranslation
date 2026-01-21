@@ -1,19 +1,12 @@
 package main
 
 import (
-	"net/http"
-
-	"github.com/gin-gonic/gin"
+	"fmt"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/router"
 )
 
 func main() {
-	r := gin.Default()
-
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
-		})
-	})
-
-	r.Run(":8080") // 后端端口
+	r := router.InitRouter()
+	r.Run(fmt.Sprintf(":%d", config.Cfg.Server.Port)) // 后端端口
 }

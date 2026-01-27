@@ -1,6 +1,7 @@
 package router
 
 import (
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/middleware/cookie"
 	"github.com/gin-gonic/gin"
 	"net/http"
 )
@@ -10,6 +11,7 @@ func InitRouter() *gin.Engine {
 
 	// 可以挂载全局中间件
 	//	r.Use(gin.Logger())
+	cookie.RegisterSession(r)
 	r.Use(gin.Recovery())
 
 	// 注册模块路由

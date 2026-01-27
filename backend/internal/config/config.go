@@ -23,14 +23,14 @@ type DatabaseConfig struct {
 	Schema   string
 }
 
-type JWTConfig struct {
+type SessionConfig struct {
 	Secret string
 }
 
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
-	JWT      JWTConfig
+	Session  SessionConfig
 }
 
 // 全局可访问的配置和数据库连接

@@ -1,18 +1,18 @@
 /*
  Navicat Premium Data Transfer
 
- Source Server         : postgresqloncentos7
+ Source Server         : ywtrans6
  Source Server Type    : PostgreSQL
- Source Server Version : 120019 (120019)
- Source Host           : 192.168.137.139:5432
+ Source Server Version : 150015 (150015)
+ Source Host           : ywtrans6.squarecatcloud.top:5432
  Source Catalog        : YwTrans
  Source Schema         : ywtrans
 
  Target Server Type    : PostgreSQL
- Target Server Version : 120019 (120019)
+ Target Server Version : 150015 (150015)
  File Encoding         : 65001
 
- Date: 21/01/2026 16:55:12
+ Date: 27/01/2026 14:19:32
 */
 
 
@@ -281,7 +281,8 @@ CREATE TABLE "ywtrans"."projects" (
                                       "translator_max" int4 NOT NULL DEFAULT 1,
                                       "proofreader_max" int4 NOT NULL DEFAULT 1,
                                       "typesetter_max" int4 NOT NULL DEFAULT 1,
-                                      "supervisor_max" int4 NOT NULL DEFAULT 1
+                                      "supervisor_max" int4 NOT NULL DEFAULT 1,
+                                      "admin_max" int4 NOT NULL DEFAULT 1
 )
 ;
 COMMENT ON COLUMN "ywtrans"."projects"."source_max" IS '图源最大人数';

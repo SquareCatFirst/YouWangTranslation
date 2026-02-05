@@ -1,38 +1,57 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
-	let email = '';
+	let username = '';
 	let password = '';
 	let error = '';
 	let loading = false;
 
-	async function handleLogin() {
+	function handleLogin() {
 		error = '';
 		loading = true;
 
-		try {
-			const response = await fetch('/api/login', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json'
+		fetch('/api/v1/auth/login', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify({
+				action: 'POST',
+				sets: [],
+				orderBy: [],
+				page: 0,
+				pageSize: 0,
+				data: {
+					username,
+					password
 				},
-				body: JSON.stringify({ email, password })
-			});
-
-			const data = await response.json();
-
-			if (response.ok) {
+				filter: {},
+				authFilter: {}
+			})
+		})
+		.then(response => response.json())
+		.then(data => {
+			if (data.status === 0) {
 				// 登录成功，保存token并跳转
-				localStorage.setItem('token', data.token);
-				await goto('/');
+				const userData = data.data[0];
+                localStorage.setItem('userId', userData.id);
+				//localStorage.setItem('token', userData.token);
+				//localStorage.setItem('userId', userData.userId);
+				//localStorage.setItem('nickname', userData.nickname);
+				//localStorage.setItem('avatarUrl', userData.avatarUrl);
+				//localStorage.setItem('role', userData.role);
+				//localStorage.setItem('expireAt', userData.expireAt);
+				goto('/');
 			} else {
-				error = data.message || '登录失败';
+				error = data.msg || '登录失败';
 			}
-		} catch (err) {
+		})
+		.catch(err => {
 			error = '网络错误，请重试';
 			console.error(err);
-		} finally {
+		})
+		.finally(() => {
 			loading = false;
-		}
+		});
 	}
 </script>
 
@@ -46,11 +65,11 @@
 
 		<form on:submit|preventDefault={handleLogin}>
 			<div class="form-group">
-			<label for="email">账号</label>
+			<label for="username">账号</label>
 			<input
-				id="email"
+				id="username"
 				type="text"
-				bind:value={email}
+				bind:value={username}
 				placeholder="请输入用户名/QQ号/邮箱"
 					disabled={loading}
 				/>

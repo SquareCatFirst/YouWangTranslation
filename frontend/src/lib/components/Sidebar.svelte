@@ -5,21 +5,22 @@
 </script>
 
 <div class="sidebar" class:open={open}>
-  <ul>
+  <ul class="nav">
     {#each menu as item}
-      <li>
-        <a href={item.href} on:click|preventDefault={() => goto(item.href)}>
-          <div class="menu-item">
-            {#if item.icon}
-              <img src={item.icon} alt={item.label} />
-            {/if}
-            <span>{item.label}</span>
-          </div>
+      <li class="nav-item">
+        <a class="nav-link" href={item.href} on:click|preventDefault={() => goto(item.href)}>
+          {#if item.icon}
+            <img class="nav-icon" src={item.icon} alt={item.label} />
+          {:else}
+            <span class="nav-icon-placeholder" aria-hidden="true"></span>
+          {/if}
+          <span class="nav-text">{item.label}</span>
         </a>
       </li>
     {/each}
   </ul>
 </div>
+
 
 <style>
    
@@ -78,18 +79,45 @@
   a:hover {
     background: #ddd;
   }
-  .menu-item {
-    display: flex;
-    flex-direction: column;
+  .nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column; /* ✅ 纵向排列 */
+  gap: 8px;
+}
+
+  .nav-link {
+    display: flex;              /* ✅ 左右排列 */
     align-items: center;
-    text-align: center;
+    gap: 10px;
+
+    padding: 10px 12px;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #333;
   }
-  .menu-item img {
-    width: 24px;
-    height: 24px;
-    margin-bottom: 4px;
+
+  .nav-link:hover {
+    background: rgba(0, 0, 0, 0.05);
   }
-  .menu-item span {
-    font-size: 12px;
+
+  .nav-icon {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
   }
+
+  .nav-icon-placeholder {
+    width: 20px;
+    height: 20px;
+    flex: 0 0 20px;
+  }
+
+  .nav-text {
+    font-size: 14px;
+    line-height: 1;
+  }
+
 </style>

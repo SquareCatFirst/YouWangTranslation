@@ -137,6 +137,7 @@
 
 	.main-content {
 		padding-top: var(--breadcrumb-h);
+ 		min-height: calc(100vh - var(--breadcrumb-h)); /* ✅ 关键：抵消顶部占用 */
 		box-sizing: border-box;
 		min-height: 100vh;
 		flex: 1;

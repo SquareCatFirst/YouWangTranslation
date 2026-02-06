@@ -34,12 +34,9 @@
 				// 登录成功，保存token并跳转
 				const userData = data.data[0];
                 localStorage.setItem('userId', userData.id);
-				//localStorage.setItem('token', userData.token);
-				//localStorage.setItem('userId', userData.userId);
-				//localStorage.setItem('nickname', userData.nickname);
-				//localStorage.setItem('avatarUrl', userData.avatarUrl);
-				//localStorage.setItem('role', userData.role);
-				//localStorage.setItem('expireAt', userData.expireAt);
+				localStorage.setItem('role', userData.role);
+				localStorage.setItem('nickname', userData.nickname);
+				localStorage.setItem('avatarUrl', userData.avatarUrl);
 				goto('/');
 			} else {
 				error = data.msg || '登录失败';

@@ -1,9 +1,6 @@
 <script lang="ts">
   import PageHeader from '$lib/components/PageHeader.svelte';
 
-  // 你原本引入的选择器我先保留（后面接真实逻辑时用得上）
-  import UserPicker, { type User } from '$lib/components/Picker/UserPicker.svelte';
-  import ChapterPicker, { type Chapter } from '$lib/components/Picker/ChapterPicker.svelte';
 
   // ====== 示例数据（你接接口时替换即可）======
   type ProjectInfo = {

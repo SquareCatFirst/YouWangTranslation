@@ -4,7 +4,6 @@
 
   import EnableSwitch from '$lib/components/EnableSwitch.svelte';
 
-  let enabled = $state(true);
 
   // 0=超级管理员 1=管理员 2=普通用户
   type RoleLevel = 0 | 1 | 2;

@@ -1,7 +1,19 @@
 # ==============================
-# 默认文本文件
+# 默认文本文件（自动判断，仓库统一 LF）
 # ==============================
 * text=auto eol=lf
+
+# ==============================
+# 前端源码（强制 LF）
+# ==============================
+*.svelte text eol=lf
+*.js     text eol=lf
+*.ts     text eol=lf
+*.jsx    text eol=lf
+*.tsx    text eol=lf
+*.css    text eol=lf
+*.scss   text eol=lf
+*.html   text eol=lf
 
 # ==============================
 # Go 语言文件
@@ -9,38 +21,35 @@
 *.go text eol=lf
 
 # ==============================
-# Shell 脚本
+# Shell / Batch
 # ==============================
-*.sh text eol=lf
+*.sh  text eol=lf
 *.bat text eol=crlf
 
 # ==============================
-# SQL / 配置文件
+# 配置 / 数据文件
 # ==============================
-*.sql text eol=lf
+*.sql  text eol=lf
 *.yaml text eol=lf
-*.yml text eol=lf
+*.yml  text eol=lf
 *.json text eol=lf
 *.toml text eol=lf
 
 # ==============================
 # 文本文档
 # ==============================
-*.md text eol=lf
+*.md  text eol=lf
 *.txt text eol=lf
 
 # ==============================
-# 忽略二进制文件换行符
+# 二进制文件（禁止换行符转换）
 # ==============================
-*.exe binary
-*.png binary
-*.jpg binary
-*.jpeg binary
-*.gif binary
-*.ico binary
-*.pdf binary
-*.zip binary
-*.tar.gz binary
-
-# SQL 文件统一 LF
-*.sql text eol=lf
+*.exe     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.gif     binary
+*.ico     binary
+*.pdf     binary
+*.zip     binary
+*.tar.gz  binary

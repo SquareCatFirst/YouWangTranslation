@@ -1,6 +1,9 @@
 <script lang="ts">
   import PageHeader from '$lib/components/PageHeader.svelte';
 
+  import ProgressBar from '$lib/components/ProgressBar.svelte';
+
+
   // ====== 模板数据（后续接接口直接替换）======
   type Overview = {
     todoCount: number;
@@ -107,12 +110,7 @@
                 <div class="task-assign">{t.assignText}</div>
 
                 <!-- 进度条 -->
-                <div class="progress" aria-label="进度条">
-                  <div class="progress-track">
-                    <div class="progress-fill" style={`width:${clamp01(t.progress)}%`} />
-                  </div>
-                  <div class="progress-text">{clamp01(t.progress)}%</div>
-                </div>
+                <ProgressBar value={t.progress} />
               </div>
             </div>
           {/each}

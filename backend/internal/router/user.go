@@ -4,6 +4,7 @@ import (
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/middleware"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/login"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/project"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/user"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,5 +28,9 @@ func RegisterUserRoutes(r *gin.Engine) {
 		proj.POST("/chapter_assignments", project.AddChangeChapterAss)
 		proj.DELETE("/chapter_assignments", project.DelChapterAss)
 		proj.POST("/project_assignments", project.AddProjAss)
+	}
+	apiUser := r.Group("/api/v1/user")
+	{
+		apiUser.GET("/list", user.UserList)
 	}
 }

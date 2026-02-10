@@ -1,9 +1,10 @@
 package router
 
 import (
+	"net/http"
+
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/middleware/cookie"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 func InitRouter() *gin.Engine {
@@ -22,6 +23,7 @@ func InitRouter() *gin.Engine {
 	})
 
 	RegisterUserRoutes(r)
+	RegisterProjectRoutes(r)
 
 	return r
 }

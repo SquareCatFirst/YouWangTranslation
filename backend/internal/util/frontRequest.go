@@ -1,8 +1,9 @@
 package util
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 type OrderByItem struct {
@@ -24,13 +25,14 @@ func ParseRequest(c *gin.Context) (*BaseRequest, bool) {
 	var req BaseRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"status":   -1,
-			"msg":      "请求参数错误",
-			"data":     []interface{}{},
-			"rowCount": 0,
-			"api":      c.FullPath(),
-			"method":   c.Request.Method,
-			"SN":       GenSN(),
+			"status":     -1,
+			"msg":        "请求参数错误",
+			"data":       []interface{}{},
+			"rowCount":   0,
+			"totalCount": 0,
+			"api":        c.FullPath(),
+			"method":     c.Request.Method,
+			"SN":         GenSN(),
 		})
 		return nil, false
 	}

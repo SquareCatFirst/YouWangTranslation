@@ -1,17 +1,33 @@
 package router
 
 import (
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/middleware"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/login"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/project"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/service/user"
 	"github.com/gin-gonic/gin"
 )
 
 func RegisterUserRoutes(r *gin.Engine) {
-	api := r.Group("/api/v1/auth")
+	auth := r.Group("/api/v1/auth")
 	{
-		api.POST("/login", login.Login)
-		api.DELETE("/logout", login.Logout)
+		auth.POST("/login", login.Login)
+		auth.DELETE("/logout", login.Logout)
+	}
 
+	proj := r.Group("/api/v1/project")
+	proj.Use(middleware.RequireLogin())
+	{
+		proj.POST("change", project.ChangeProj)
+		proj.POST("", project.CreateProj)
+		proj.GET("", project.GetProj)
+		proj.DELETE("", project.DelProj)
+		proj.POST("/chapter", project.AddChangeChapter)
+		proj.DELETE("/chapter", project.DelChapter)
+		proj.POST("/chapter/image", project.AddDelChapterImg)
+		proj.POST("/chapter_assignments", project.AddChangeChapterAss)
+		proj.DELETE("/chapter_assignments", project.DelChapterAss)
+		proj.POST("/project_assignments", project.AddProjAss)
 	}
 	apiUser := r.Group("/api/v1/user")
 	{

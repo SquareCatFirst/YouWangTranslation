@@ -1,7 +1,7 @@
 package project
 
 import (
-	"time"
+	"errors"
 
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/model"
@@ -13,29 +13,45 @@ import (
 func AddProjAss(c *gin.Context) {
 	req, ok := util.ParseRequest(c)
 	if !ok {
+		util.SendJSON(c, -1, "添加权限失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 
-	if req.Data["tags"] == nil {
-		util.SendJSON(c, -1, "新建项目失败，标签不能为空", []interface{}{}, 0, c.FullPath(), c.Request.Method)
+	var projID int64
+	if req.Data["project_id"] == "" {
+		util.SendJSON(c, -1, "添加权限失败: 缺少项目ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	} else {
+		projID = util.GetInt64(req.Data, "project_id")
+	}
+
+	var role int
+	if req.Data["role"] == "" {
+		util.SendJSON(c, -1, "添加权限失败: 缺少添加角色", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	} else if req.Data["role"] == "admin" {
+		role = 0
+	} else if req.Data["role"] == "source" {
+		role = 1
+	} else if req.Data["role"] == "supervisor" {
+		role = 5
+	} else if req.Data["role"] == "translator" {
+		role = 2
+	} else if req.Data["role"] == "proofreader" {
+		role = 3
+	} else if req.Data["role"] == "typesetter" {
+		role = 4
+	} else {
+		util.SendJSON(c, -1, "添加权限失败: 角色不合法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 
-	if req.Data["project_chapters"] == nil {
-		util.SendJSON(c, -1, "项目章节不能为空", []interface{}{}, 0, c.FullPath(), c.Request.Method)
-		return
-	}
-
-	if req.Data["translated_name"] == nil {
-		req.Data["translated_name"] = "未命名作品_" + time.Now().Format("20060102150405")
-	}
-
-	if req.Data["name"] == nil {
-		req.Data["name"] = "未命名项目_" + time.Now().Format("20060102150405")
-	}
-
-	if req.Data["cover_url"] == nil {
-		req.Data["cover_url"] = "https://photogzmaz.photo.store.qq.com/psc?/V51HTR1T39Mw3r0KnhDf0s3GGb00Md4m/LiySpxowE0yeWXwBdXN*SZtR4lEJbZQy.tXoFnEAwuCc.zRtxEvY7TUHn1XeFAvH2Ap9TR6dZLWify3q1DlUXO1lm5iuv4eNwoFneoXOodU!/b&bo=qgHwAKoB8AACByM!&rf=viewer_4"
+	// tags 是 JSON 里的数组时通常会被解码成 []interface{}。
+	// 这里正确判断：没传 / null / 空数组 时设置默认值。
+	if v, ok := req.Data["tags"]; !ok || v == nil {
+		req.Data["tags"] = []int{4}
+	} else if s, ok := v.([]interface{}); ok && len(s) == 0 {
+		req.Data["tags"] = []int{4}
 	}
 
 	row := model.Project{
@@ -48,236 +64,72 @@ func AddProjAss(c *gin.Context) {
 
 		Description:            util.GetPtrString(req.Data, "description"),
 		TranslationDescription: util.GetPtrString(req.Data, "translation_description"),
-
-		SourceMax:      util.GetInt(req.Data, "source_max"),
-		TranslatorMax:  util.GetInt(req.Data, "translator_max"),
-		ProofreaderMax: util.GetInt(req.Data, "proofreader_max"),
-		TypesetterMax:  util.GetInt(req.Data, "typesetter_max"),
-		SupervisorMax:  util.GetInt(req.Data, "supervisor_max"),
-		AdminMax:       util.GetInt(req.Data, "admin_max"),
 	}
 
-	type mem struct {
-		user_id int64
-		role    int32
+	if config.DB.Where("id = ?", projID).First(&model.Project{}).Error != nil {
+		if config.DB.Where("id = ?", projID).First(&model.Project{}).Error == gorm.ErrRecordNotFound {
+			util.SendJSON(c, -1, "添加权限失败: 项目不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		util.SendJSON(c, -1, "添加权限失败: 查询数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
 	}
 
-	// var mpusr map[int64]map[]
+	var role_num int64
+	if config.DB.Model(&model.ProjectAssignment{}).Where("project_id = ? AND role = ?", projID, role).Count(&role_num).Error != nil {
+		util.SendJSON(c, -1, "添加权限失败: 查询数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	}
 
 	if config.DB.Transaction(func(tx *gorm.DB) error {
-		if tx.Create(&row).Error != nil {
+		if req.Data["role"] == "admin" {
+			row.AdminMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		} else if req.Data["role"] == "source" {
+			row.SourceMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		} else if req.Data["role"] == "supervisor" {
+			row.SupervisorMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		} else if req.Data["role"] == "translator" {
+			row.TranslatorMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		} else if req.Data["role"] == "proofreader" {
+			row.ProofreaderMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		} else if req.Data["role"] == "typesetter" {
+			row.TypesetterMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		}
+
+		if tx.Where("id = ?", projID).Updates(&row).Error != nil {
 			return tx.Error
 		}
 
-		for _, item := range req.Data["project_chapters"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_chapter_row := model.ProjectChapter{
-				ProjectID:   row.ID,
-				ChapterName: util.GetString(mp, "chapter_name"),
-				IsVisible:   util.GetBool(mp, "is_visible"),
-				OrderIndex:  util.GetInt(mp, "order_index"),
-			}
-
-			if tx.Create(&proj_chapter_row).Error != nil {
-				return tx.Error
-			}
-
-			for _, chapter_item := range mp["images"].([]interface{}) {
-				chapter_mp := chapter_item.(map[string]interface{})
-				chapter_work_img_row := model.ChapterWorkImage{
-					ChapterID: proj_chapter_row.ID,
-					Role:      0,
-					ImageURL:  chapter_mp["image_url"].(string),
-
-					OrderIndex: util.GetInt(chapter_mp, "order_index"),
-				}
-
-				if tx.Create(&chapter_work_img_row).Error != nil {
-					return tx.Error
-				}
-			}
-		}
-
 		for _, item := range req.Data["admin"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       0,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
+			m, ok := item.(map[string]interface{})
+			if !ok {
+				return errors.New("添加权限失败: admin 数组元素格式不合法")
+			}
+			if m["user_id"] == nil || m["assigned_by"] == nil {
+				return errors.New("添加权限失败: 请求数据不合法")
+			}
+			assignedBy := util.AsInt64(m["assigned_by"], 0)
+			ass_row := model.ProjectAssignment{
+				ProjectID:  projID,
+				UserID:     m["user_id"].(int64),
+				Role:       role,
+				AssignedBy: &assignedBy,
 			}
 
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       0,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
+			if tx.Create(&ass_row).Error != nil {
 				return tx.Error
 			}
 		}
-
-		for _, item := range req.Data["source"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       1,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       1,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
-				return tx.Error
-			}
-		}
-
-		for _, item := range req.Data["translator"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       2,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       2,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
-				return tx.Error
-			}
-		}
-
-		for _, item := range req.Data["proofreader"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       3,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       3,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
-				return tx.Error
-			}
-		}
-
-		for _, item := range req.Data["typesetter"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       4,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       4,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
-				return tx.Error
-			}
-		}
-
-		for _, item := range req.Data["supervisor"].([]interface{}) {
-			mp := item.(map[string]interface{})
-			proj_ass_row := model.ProjectAssignment{
-				ProjectID:  row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       5,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&proj_ass_row).Error != nil {
-				return tx.Error
-			}
-
-			chapter_ass_row := model.ChapterAssignment{
-				ChapterID:  proj_ass_row.ID,
-				UserID:     util.GetInt64(mp, "user_id"),
-				Role:       5,
-				AssignedBy: util.GetPtrInt64(mp, "assigned_by"),
-			}
-
-			if tx.Create(&chapter_ass_row).Error != nil {
-				return tx.Error
-			}
-		}
-
-		for _, item := range req.Data["tags"].([]interface{}) {
-			proj_tag_row := model.ProjectTag{
-				ProjectID: row.ID,
-				TagID:     util.GetInt64(item.(map[string]interface{}), "tag_id"),
-			}
-
-			if tx.Create(&proj_tag_row).Error != nil {
-				return tx.Error
-			}
-		}
-
 		return nil
 	}) == nil {
-		chapterCount := 0
-		if v := req.Data["project_chapters"]; v != nil {
-			if chapters, ok := v.([]interface{}); ok {
-				chapterCount = len(chapters)
-			}
-		}
-
-		util.SendJSON(c, 0, "新建项目成功", []gin.H{
+		util.SendJSON(c, 0, "添加权限成功", []gin.H{
 			{
-				"project_id":    row.ID,
-				"name":          req.Data["name"],
-				"cover_url":     req.Data["cover_url"],
-				"created_at":    row.CreatedAt,
-				"chapter_count": chapterCount,
-			}}, 1, c.FullPath(), c.Request.Method)
+				"project_id": row.ID,
+				"name":       req.Data["name"],
+				"created_at": row.CreatedAt,
+			}}, 1, 1, c.FullPath(), c.Request.Method)
 	} else {
-		util.SendJSON(c, -1, "新建项目失败", []interface{}{}, 0, c.FullPath(), c.Request.Method)
+		util.SendJSON(c, -1, "添加权限失败：添加数据失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 }

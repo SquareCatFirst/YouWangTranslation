@@ -277,9 +277,9 @@ func CreateProject(c *gin.Context) {
 				"cover_url":     req.Data["cover_url"],
 				"created_at":    row.CreatedAt,
 				"chapter_count": chapterCount,
-			}}, 1, c.FullPath(), c.Request.Method)
+			}}, 1, 0, c.FullPath(), c.Request.Method)
 	} else {
-		util.SendJSON(c, -1, "新建项目失败", []interface{}{}, 0, c.FullPath(), c.Request.Method)
+		util.SendJSON(c, -1, "新建项目失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 }

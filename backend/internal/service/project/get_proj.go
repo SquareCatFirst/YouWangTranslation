@@ -9,7 +9,7 @@ import (
 )
 
 func GetProj(c *gin.Context) {
-	req, ok := util.ParseRequest(c)
+	req, ok := util.GetParseRequest(c)
 	if !ok {
 		util.SendJSON(c, -1, "获取项目失败：解析请求失败", []interface{}{}, 0, 1, c.FullPath(), c.Request.Method)
 		return

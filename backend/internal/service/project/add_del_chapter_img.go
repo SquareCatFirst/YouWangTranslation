@@ -47,28 +47,24 @@ func AddDelChapterImg(c *gin.Context) {
 					return errors.New("章节ID不存在")
 				}
 
-				// 获取当前最大OrderIndex
-				var maxOrderIndex int
-				var lastImg model.ChapterWorkImage
-				if tx.Model(&model.ChapterWorkImage{}).Where("chapter_id = ?", chapterID).Order("order_index desc").First(&lastImg).Error == nil {
-					maxOrderIndex = lastImg.OrderIndex
-				} else {
-					maxOrderIndex = 0
-				}
-
 				newImg := model.ChapterWorkImage{
-					ChapterID:  chapterID,
-					Role:       int16(util.AsInt(imgMap["role"], 0)),
-					ImageURL:   util.GetString(imgMap, "image_url"),
-					OrderIndex: maxOrderIndex + 1,
+					ChapterID: chapterID,
+					Role:      int16(util.AsInt(imgMap["role"], 0)),
+					ImageURL:  util.GetString(imgMap, "image_url"),
 				}
 
 				if newImg.ImageURL == "" {
 					return errors.New("图片URL不能为空")
 				}
 
-				if err := tx.Create(&newImg).Error; err != nil {
-					return err
+				if !util.ChapterWorkImageInsert(chapterID, newImg.Role, newImg.ImageURL) {
+					return errors.New("插入图片失败")
+				}
+
+				if err := tx.Where("chapter_id = ? AND role = ? AND image_url = ?", chapterID, newImg.Role, newImg.ImageURL).
+					Order("order_index desc, id desc").
+					First(&newImg).Error; err != nil {
+					return errors.New("读取新增图片失败")
 				}
 
 				resultImages = append(resultImages, gin.H{

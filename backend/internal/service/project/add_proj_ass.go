@@ -116,8 +116,8 @@ func AddProjAss(c *gin.Context) {
 				AssignedBy: &assignedBy,
 			}
 
-			if tx.Create(&ass_row).Error != nil {
-				return tx.Error
+			if !util.ProjectAssignmentInsert(ass_row.ProjectID, ass_row.UserID, ass_row.Role, ass_row.AssignedBy) {
+				return errors.New("添加权限失败: 写入权限记录失败")
 			}
 		}
 		return nil

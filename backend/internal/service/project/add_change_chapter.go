@@ -33,21 +33,12 @@ func AddChangeChapter(c *gin.Context) {
 			ChapterName: "未命名章节" + util.GenSN(),
 		}
 
-		if config.DB.Transaction(func(tx *gorm.DB) error {
-
-			search_max := model.ProjectChapter{}
-
-			if config.DB.Where("project_id = ?", projID).Order("order_index desc").First(&search_max).Error != nil {
-				row.OrderIndex = 1
-			} else {
-				row.OrderIndex = search_max.OrderIndex + 1
+		if util.ProjectChapterInsert(projID, row.ChapterName, row.IsVisible) {
+			if err := config.DB.Where("project_id = ?", projID).Order("order_index desc, id desc").First(&row).Error; err != nil {
+				util.SendJSON(c, -1, "添加章节失败：读取新增章节失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
 			}
 
-			if tx.Create(&row).Error != nil {
-				return tx.Error
-			}
-			return nil
-		}) == nil {
 			util.NormProjChapter(projID)
 
 			project_chapters := []model.ProjectChapter{}

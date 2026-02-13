@@ -43,9 +43,9 @@ func CreateProj(c *gin.Context) {
 	// tags 是 JSON 里的数组时通常会被解码成 []interface{}。
 	// 这里正确判断：没传 / null / 空数组 时设置默认值。
 	if v, ok := req.Data["tags"]; !ok || v == nil {
-		req.Data["tags"] = []int{4}
+		req.Data["tags"] = []interface{}{int64(4)}
 	} else if s, ok := v.([]interface{}); ok && len(s) == 0 {
-		req.Data["tags"] = []int{4}
+		req.Data["tags"] = []interface{}{int64(4)}
 	}
 
 	row := model.Project{
@@ -72,13 +72,21 @@ func CreateProj(c *gin.Context) {
 			return tx.Error
 		}
 
-		for _, tagID := range req.Data["tags"].([]interface{}) {
+		tags, ok := util.AsSlice(req.Data["tags"])
+		if !ok {
+			return gorm.ErrInvalidData
+		}
+
+		for _, tagID := range tags {
 			proj_tags_row := model.ProjectTag{
 				ProjectID: int64(row.ID),
-				TagID:     int64(tagID.(int64)),
+				TagID:     util.AsInt64(tagID, 0),
+			}
+			if proj_tags_row.TagID == 0 {
+				return gorm.ErrInvalidData
 			}
 
-			if tx.Create(&proj_tags_row).Error != nil {
+			if !util.ProjectTagInsert(proj_tags_row.ProjectID, proj_tags_row.TagID) {
 				return tx.Error
 			}
 		}

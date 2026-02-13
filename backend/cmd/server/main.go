@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/router"
 )

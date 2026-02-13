@@ -1,15 +1,129 @@
 package project
 
 import (
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/model"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/util"
 	"github.com/gin-gonic/gin"
 )
 
 func AddChangeChapterAss(c *gin.Context) {
-	// req, ok := util.ParseRequest(c)
-	// if !ok {
-	// 	util.SendJSON(c, -1, "操作失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
-	// 	return
-	// }
+	req, ok := util.ParseRequest(c)
+	if !ok {
+		util.SendJSON(c, -1, "操作失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	}
+
+	if req.Action == "add" {
+		if req.Data["chapter_id"] == nil {
+			util.SendJSON(c, -1, "添加权限失败：缺少章节ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		if req.Data["user_id"] == nil {
+			util.SendJSON(c, -1, "添加权限失败：缺少用户ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		if req.Data["role"] == nil {
+			util.SendJSON(c, -1, "添加权限失败：缺少角色", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		if req.Data["assigned_by"] == nil {
+			util.SendJSON(c, -1, "添加权限失败：缺少指派人ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		chapterID := util.GetInt64(req.Data, "chapter_id")
+		userID := util.GetInt64(req.Data, "user_id")
+		role := util.GetInt(req.Data, "role")
+		assignedBy := util.GetInt64(req.Data, "assigned_by")
+
+		if config.DB.Where("id = ?", chapterID).First(&model.ProjectChapter{}).Error != nil {
+			util.SendJSON(c, -1, "添加权限失败：章节不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		if !util.ChapterAssignmentInsert(chapterID, userID, role, assignedBy) {
+			util.SendJSON(c, -1, "添加权限失败：写入数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		util.SendJSON(c, 0, "添加权限成功", []interface{}{
+			gin.H{
+				"chapter_id":  chapterID,
+				"user_id":     userID,
+				"role":        role,
+				"assigned_by": assignedBy,
+			},
+		}, 1, 1, c.FullPath(), c.Request.Method)
+		return
+
+	} else if req.Action == "change" {
+		if req.Data["assignment_id"] == nil {
+			util.SendJSON(c, -1, "修改权限失败：缺少权限记录ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		assignmentID := util.GetInt64(req.Data, "assignment_id")
+		row := model.ChapterAssignment{}
+		if config.DB.Where("id = ?", assignmentID).First(&row).Error != nil {
+			util.SendJSON(c, -1, "修改权限失败：权限记录不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		updates := map[string]interface{}{}
+
+		if req.Data["chapter_id"] != nil {
+			chapterID := util.GetInt64(req.Data, "chapter_id")
+			if config.DB.Where("id = ?", chapterID).First(&model.ProjectChapter{}).Error != nil {
+				util.SendJSON(c, -1, "修改权限失败：章节不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+			updates["chapter_id"] = chapterID
+		}
+
+		if req.Data["user_id"] != nil {
+			updates["user_id"] = util.GetInt64(req.Data, "user_id")
+		}
+
+		if req.Data["role"] != nil {
+			updates["role"] = util.GetInt(req.Data, "role")
+		}
+
+		if req.Data["assigned_by"] != nil {
+			assignedBy := util.GetInt64(req.Data, "assigned_by")
+			updates["assigned_by"] = assignedBy
+		}
+
+		if len(updates) == 0 {
+			util.SendJSON(c, -1, "修改权限失败：没有可更新字段", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		if config.DB.Model(&row).Updates(updates).Error != nil {
+			util.SendJSON(c, -1, "修改权限失败：写入数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		if config.DB.Where("id = ?", assignmentID).First(&row).Error != nil {
+			util.SendJSON(c, -1, "修改权限失败：读取更新结果失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		util.SendJSON(c, 0, "修改权限成功", []interface{}{
+			gin.H{
+				"assignment_id": row.ID,
+				"chapter_id":    row.ChapterID,
+				"user_id":       row.UserID,
+				"role":          row.Role,
+				"assigned_by":   row.AssignedBy,
+			},
+		}, 1, 1, c.FullPath(), c.Request.Method)
+		return
+
+	} else {
+		util.SendJSON(c, -1, "操作失败: 操作类型不合法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	}
 
 	// if req.Data["action"] == nil {
 	// 	util.SendJSON(c, -1, "操作失败: 缺少操作类型", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)

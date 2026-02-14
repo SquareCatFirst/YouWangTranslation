@@ -15,7 +15,14 @@ func DelChapterAss(c *gin.Context) {
 		return
 	}
 
-	if v, ok := req.Data["chapter_ass_id"]; !ok || v == nil {
+	assignmentID := util.GetInt64(req.Data, "chapter_assignment_id")
+	if assignmentID == 0 {
+		assignmentID = util.GetInt64(req.Data, "assignment_id")
+	}
+	if assignmentID == 0 {
+		assignmentID = util.GetInt64(req.Data, "project_assignment_id")
+	}
+	if assignmentID == 0 {
 		util.SendJSON(c, -1, "删除章节指派失败：缺少章节指派ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
@@ -26,7 +33,7 @@ func DelChapterAss(c *gin.Context) {
 	}
 
 	if config.DB.Transaction(func(tx *gorm.DB) error {
-		if tx.Delete(&model.ProjectAssignment{}, util.GetInt64(req.Data, "chapter_ass_id")).Error != nil {
+		if tx.Delete(&model.ChapterAssignment{}, assignmentID).Error != nil {
 			return tx.Error
 		}
 		return nil

@@ -1,48 +1,95 @@
 package project
 
 import (
+	"errors"
+
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/model"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func AddChangeChapterAss(c *gin.Context) {
 	req, ok := util.ParseRequest(c)
 	if !ok {
-		util.SendJSON(c, -1, "操作失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 
 	if req.Action == "add" {
-		if req.Data["chapter_id"] == nil {
-			util.SendJSON(c, -1, "添加权限失败：缺少章节ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		projID := util.GetInt64(req.Data, "project_id")
+		if projID == 0 {
+			util.SendJSON(c, -1, "添加权限失败：缺少项目ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 			return
 		}
-		if req.Data["user_id"] == nil {
-			util.SendJSON(c, -1, "添加权限失败：缺少用户ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
-			return
-		}
-		if req.Data["role"] == nil {
-			util.SendJSON(c, -1, "添加权限失败：缺少角色", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
-			return
-		}
-		if req.Data["assigned_by"] == nil {
-			util.SendJSON(c, -1, "添加权限失败：缺少指派人ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+
+		if err := config.DB.Where("id = ?", projID).First(&model.Project{}).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				util.SendJSON(c, -1, "添加权限失败：项目不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+			util.SendJSON(c, -1, "添加权限失败：查询项目失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 			return
 		}
 
 		chapterID := util.GetInt64(req.Data, "chapter_id")
-		userID := util.GetInt64(req.Data, "user_id")
-		role := util.GetInt(req.Data, "role")
-		assignedBy := util.GetInt64(req.Data, "assigned_by")
+		if chapterID == 0 {
+			var firstChapter model.ProjectChapter
+			if err := config.DB.Where("project_id = ?", projID).Order("order_index asc, id asc").First(&firstChapter).Error; err != nil {
+				if err == gorm.ErrRecordNotFound {
+					util.SendJSON(c, -1, "添加权限失败：项目下无章节可分配", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+					return
+				}
+				util.SendJSON(c, -1, "添加权限失败：查询章节失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+			chapterID = firstChapter.ID
+		}
 
-		if config.DB.Where("id = ?", chapterID).First(&model.ProjectChapter{}).Error != nil {
+		if err := config.DB.Where("id = ?", chapterID).First(&model.ProjectChapter{}).Error; err != nil {
 			util.SendJSON(c, -1, "添加权限失败：章节不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 			return
 		}
 
-		if !util.ChapterAssignmentInsert(chapterID, userID, role, assignedBy) {
+		ctxUID, hasUID := c.Get("user_id")
+		loginUID := int64(0)
+		if hasUID {
+			loginUID = util.AsInt64(ctxUID, 0)
+		}
+
+		userID := util.GetInt64(req.Data, "user_id")
+		if userID == 0 {
+			userID = loginUID
+		}
+		if userID == 0 {
+			util.SendJSON(c, -1, "添加权限失败：缺少用户ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		role := util.GetInt(req.Data, "role")
+		if role < 0 || role > 5 {
+			role = 0
+		}
+
+		assignedBy := util.GetInt64(req.Data, "assigned_by")
+		if assignedBy == 0 {
+			assignedBy = loginUID
+		}
+		if assignedBy == 0 {
+			assignedBy = userID
+		}
+
+		if err := config.DB.Where("id = ?", userID).First(&model.User{}).Error; err != nil {
+			util.SendJSON(c, -1, "添加权限失败：用户不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+
+		if config.DB.Transaction(func(tx *gorm.DB) error {
+			if !util.ChapterAssignmentInsert(tx, chapterID, userID, role, assignedBy) {
+				return errors.New("写入数据库失败")
+			}
+			return nil
+		}) != nil {
 			util.SendJSON(c, -1, "添加权限失败：写入数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 			return
 		}

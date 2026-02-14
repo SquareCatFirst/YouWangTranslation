@@ -1,6 +1,8 @@
 package project
 
 import (
+	"errors"
+
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/model"
 	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/util"
@@ -33,7 +35,12 @@ func AddChangeChapter(c *gin.Context) {
 			ChapterName: "未命名章节" + util.GenSN(),
 		}
 
-		if util.ProjectChapterInsert(projID, row.ChapterName, row.IsVisible) {
+		if config.DB.Transaction(func(tx *gorm.DB) error {
+			if !util.ProjectChapterInsert(tx, projID, row.ChapterName, row.IsVisible) {
+				return errors.New("添加章节失败：添加数据失败")
+			}
+			return nil
+		}) == nil {
 			if err := config.DB.Where("project_id = ?", projID).Order("order_index desc, id desc").First(&row).Error; err != nil {
 				util.SendJSON(c, -1, "添加章节失败：读取新增章节失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 				return

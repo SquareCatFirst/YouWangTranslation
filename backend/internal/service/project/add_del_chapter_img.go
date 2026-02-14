@@ -52,13 +52,16 @@ func AddDelChapterImg(c *gin.Context) {
 					Role:      int16(util.AsInt(imgMap["role"], 0)),
 					ImageURL:  util.GetString(imgMap, "image_url"),
 				}
+				if newImg.Role < 0 || newImg.Role > 5 {
+					return errors.New("role 非法：只允许 0~5")
+				}
 
 				if newImg.ImageURL == "" {
 					return errors.New("图片URL不能为空")
 				}
 
-				if !util.ChapterWorkImageInsert(chapterID, newImg.Role, newImg.ImageURL) {
-					return errors.New("插入图片失败")
+				if err := util.ChapterWorkImageInsert(tx, chapterID, newImg.Role, newImg.ImageURL); err != nil {
+					return errors.New("插入图片失败: " + err.Error())
 				}
 
 				if err := tx.Where("chapter_id = ? AND role = ? AND image_url = ?", chapterID, newImg.Role, newImg.ImageURL).

@@ -78,15 +78,28 @@ func CreateProj(c *gin.Context) {
 		}
 
 		for _, tagID := range tags {
+			tagIDInt64 := util.AsInt64(tagID, 0)
+			if tagIDInt64 == 0 {
+				return gorm.ErrInvalidData
+			}
+
+			var tagCount int64
+			if err := tx.Model(&model.Tag{}).Where("id = ?", tagIDInt64).Count(&tagCount).Error; err != nil {
+				return err
+			}
+			if tagCount == 0 {
+				return gorm.ErrInvalidData
+			}
+
 			proj_tags_row := model.ProjectTag{
 				ProjectID: int64(row.ID),
-				TagID:     util.AsInt64(tagID, 0),
+				TagID:     tagIDInt64,
 			}
 			if proj_tags_row.TagID == 0 {
 				return gorm.ErrInvalidData
 			}
 
-			if !util.ProjectTagInsert(proj_tags_row.ProjectID, proj_tags_row.TagID) {
+			if !util.ProjectTagInsert(tx, proj_tags_row.ProjectID, proj_tags_row.TagID) {
 				return tx.Error
 			}
 		}

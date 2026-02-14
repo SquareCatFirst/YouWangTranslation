@@ -43,9 +43,9 @@ func ChangeProj(c *gin.Context) {
 	// tags 是 JSON 里的数组时通常会被解码成 []interface{}。
 	// 这里正确判断：没传 / null / 空数组 时设置默认值。
 	if v, ok := req.Data["tags"]; !ok || v == nil {
-		req.Data["tags"] = []int{4}
+		req.Data["tags"] = []interface{}{int64(4)}
 	} else if s, ok := v.([]interface{}); ok && len(s) == 0 {
-		req.Data["tags"] = []int{4}
+		req.Data["tags"] = []interface{}{int64(4)}
 	}
 
 	row := model.Project{
@@ -59,6 +59,14 @@ func ChangeProj(c *gin.Context) {
 		Description:            util.GetPtrString(req.Data, "description"),
 		TranslationDescription: util.GetPtrString(req.Data, "translation_description"),
 	}
+
+	projID := util.GetInt64(req.Data, "project_id")
+	if projID == 0 {
+		util.SendJSON(c, -1, "修改项目失败: 缺少或非法项目ID", []interface{}{}, 0, 1, c.FullPath(), c.Request.Method)
+		return
+	}
+
+	var updatedProj model.Project
 
 	if config.DB.Transaction(func(tx *gorm.DB) error {
 		// JSON 反序列化到 map[string]interface{} 时，数字通常会变成 float64，
@@ -82,33 +90,61 @@ func ChangeProj(c *gin.Context) {
 			row.TypesetterMax = util.AsInt(v, 1)
 		}
 
-		projID := util.GetInt64(req.Data, "project_id")
-		err := config.DB.Where("id = ?", projID).Updates(&row).Error
+		result := tx.Where("id = ?", projID).Updates(&row)
+		err := result.Error
 		if err != nil {
 			return err
+		}
+		if result.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
 		}
 
 		if err := tx.Delete(&model.ProjectTag{}, "project_id = ?", projID).Error; err != nil {
 			return err
 		}
 
-		for _, tagID := range req.Data["tags"].([]interface{}) {
+		tags, ok := util.AsSlice(req.Data["tags"])
+		if !ok {
+			return gorm.ErrInvalidData
+		}
+
+		for _, tagID := range tags {
+			tagIDInt64 := util.AsInt64(tagID, 0)
+			if tagIDInt64 == 0 {
+				return gorm.ErrInvalidData
+			}
+
+			var tagCount int64
+			if err := tx.Model(&model.Tag{}).Where("id = ?", tagIDInt64).Count(&tagCount).Error; err != nil {
+				return err
+			}
+			if tagCount == 0 {
+				return gorm.ErrInvalidData
+			}
+
 			proj_tags_row := model.ProjectTag{
 				ProjectID: projID,
-				TagID:     int64(tagID.(int64)),
+				TagID:     tagIDInt64,
 			}
-			if tx.Create(&proj_tags_row).Error != nil {
+			if proj_tags_row.TagID == 0 {
+				return gorm.ErrInvalidData
+			}
+			if !util.ProjectTagInsert(tx, proj_tags_row.ProjectID, proj_tags_row.TagID) {
 				return tx.Error
 			}
+		}
+
+		if err := tx.Select("id", "name", "created_at").First(&updatedProj, projID).Error; err != nil {
+			return err
 		}
 
 		return nil
 	}) == nil {
 		util.SendJSON(c, 0, "修改项目成功", []gin.H{
 			{
-				"project_id": row.ID,
-				"name":       req.Data["name"],
-				"created_at": row.CreatedAt,
+				"project_id": updatedProj.ID,
+				"name":       updatedProj.Name,
+				"created_at": updatedProj.CreatedAt,
 			}}, 1, 1, c.FullPath(), c.Request.Method)
 	} else {
 		util.SendJSON(c, -1, "修改项目失败：修改数据失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)

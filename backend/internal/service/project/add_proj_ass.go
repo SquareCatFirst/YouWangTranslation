@@ -10,6 +10,25 @@ import (
 	"gorm.io/gorm"
 )
 
+func roleNameToCode(roleName string) (int, string, string, string, bool) {
+	switch roleName {
+	case "admin":
+		return 0, "admin", "admin_max", "admin_max", true
+	case "source":
+		return 1, "source", "source_max", "source_max", true
+	case "translator":
+		return 2, "translator", "translator_max", "translator_max", true
+	case "proofreader":
+		return 3, "proofreader", "proofreader_max", "proofreader_max", true
+	case "typesetter":
+		return 4, "typesetter", "typesetter_max", "typesetter_max", true
+	case "supervisor":
+		return 5, "supervisor", "supervisor_max", "supervisor_max", true
+	default:
+		return 0, "", "", "", false
+	}
+}
+
 func AddProjAss(c *gin.Context) {
 	req, ok := util.ParseRequest(c)
 	if !ok {
@@ -17,57 +36,55 @@ func AddProjAss(c *gin.Context) {
 		return
 	}
 
-	var projID int64
-	if req.Data["project_id"] == "" {
+	projID := util.GetInt64(req.Data, "project_id")
+	if projID == 0 {
 		util.SendJSON(c, -1, "添加权限失败: 缺少项目ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
-	} else {
-		projID = util.GetInt64(req.Data, "project_id")
 	}
 
-	var role int
-	if req.Data["role"] == "" {
+	roleName := util.GetString(req.Data, "role")
+	if roleName == "" {
 		util.SendJSON(c, -1, "添加权限失败: 缺少添加角色", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
-	} else if req.Data["role"] == "admin" {
-		role = 0
-	} else if req.Data["role"] == "source" {
-		role = 1
-	} else if req.Data["role"] == "supervisor" {
-		role = 5
-	} else if req.Data["role"] == "translator" {
-		role = 2
-	} else if req.Data["role"] == "proofreader" {
-		role = 3
-	} else if req.Data["role"] == "typesetter" {
-		role = 4
-	} else {
+	}
+
+	role, memberKey, maxColumn, reqMaxKey, ok := roleNameToCode(roleName)
+	if !ok {
 		util.SendJSON(c, -1, "添加权限失败: 角色不合法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 
-	// tags 是 JSON 里的数组时通常会被解码成 []interface{}。
-	// 这里正确判断：没传 / null / 空数组 时设置默认值。
-	if v, ok := req.Data["tags"]; !ok || v == nil {
-		req.Data["tags"] = []int{4}
-	} else if s, ok := v.([]interface{}); ok && len(s) == 0 {
-		req.Data["tags"] = []int{4}
+	membersRaw, ok := util.AsSlice(req.Data[memberKey])
+	if !ok || len(membersRaw) == 0 {
+		util.SendJSON(c, -1, "添加权限失败: 缺少角色成员数据", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
 	}
 
-	row := model.Project{
-		CoverURL: util.GetPtrString(req.Data, "cover_url"),
-
-		Name:           util.GetString(req.Data, "name"),
-		TranslatedName: util.GetPtrString(req.Data, "translated_name"),
-		Author:         util.GetPtrString(req.Data, "author"),
-		SourceSite:     util.GetPtrString(req.Data, "source_site"),
-
-		Description:            util.GetPtrString(req.Data, "description"),
-		TranslationDescription: util.GetPtrString(req.Data, "translation_description"),
+	memberRows := make([]model.ProjectAssignment, 0, len(membersRaw))
+	for _, item := range membersRaw {
+		m, ok := util.AsMap(item)
+		if !ok {
+			util.SendJSON(c, -1, "添加权限失败: 成员数据格式不合法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		userID := util.AsInt64(m["user_id"], 0)
+		assignedBy := util.AsInt64(m["assigned_by"], 0)
+		if userID == 0 || assignedBy == 0 {
+			util.SendJSON(c, -1, "添加权限失败: user_id 或 assigned_by 非法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		assignedByCopy := assignedBy
+		memberRows = append(memberRows, model.ProjectAssignment{
+			ProjectID:  projID,
+			UserID:     userID,
+			Role:       role,
+			AssignedBy: &assignedByCopy,
+		})
 	}
 
-	if config.DB.Where("id = ?", projID).First(&model.Project{}).Error != nil {
-		if config.DB.Where("id = ?", projID).First(&model.Project{}).Error == gorm.ErrRecordNotFound {
+	row := model.Project{}
+	if err := config.DB.Where("id = ?", projID).First(&row).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
 			util.SendJSON(c, -1, "添加权限失败: 项目不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 			return
 		}
@@ -75,59 +92,29 @@ func AddProjAss(c *gin.Context) {
 		return
 	}
 
-	var role_num int64
-	if config.DB.Model(&model.ProjectAssignment{}).Where("project_id = ? AND role = ?", projID, role).Count(&role_num).Error != nil {
+	var roleNum int64
+	if config.DB.Model(&model.ProjectAssignment{}).Where("project_id = ? AND role = ?", projID, role).Count(&roleNum).Error != nil {
 		util.SendJSON(c, -1, "添加权限失败: 查询数据库失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return
 	}
 
 	if config.DB.Transaction(func(tx *gorm.DB) error {
-		if req.Data["role"] == "admin" {
-			row.AdminMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
-		} else if req.Data["role"] == "source" {
-			row.SourceMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
-		} else if req.Data["role"] == "supervisor" {
-			row.SupervisorMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
-		} else if req.Data["role"] == "translator" {
-			row.TranslatorMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
-		} else if req.Data["role"] == "proofreader" {
-			row.ProofreaderMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
-		} else if req.Data["role"] == "typesetter" {
-			row.TypesetterMax = max(row.AdminMax, int(role_num)+len(req.Data["admin"].([]interface{})))
+		newMax := int(roleNum) + len(memberRows)
+		maxValue := max(newMax, util.GetInt(req.Data, reqMaxKey))
+		if err := tx.Model(&model.Project{}).
+			Where("id = ?", projID).
+			Updates(map[string]interface{}{maxColumn: maxValue}).Error; err != nil {
+			return err
 		}
 
-		if tx.Where("id = ?", projID).Updates(&row).Error != nil {
-			return tx.Error
-		}
-
-		for _, item := range req.Data["admin"].([]interface{}) {
-			m, ok := item.(map[string]interface{})
-			if !ok {
-				return errors.New("添加权限失败: admin 数组元素格式不合法")
-			}
-			if m["user_id"] == nil || m["assigned_by"] == nil {
-				return errors.New("添加权限失败: 请求数据不合法")
-			}
-			assignedBy := util.AsInt64(m["assigned_by"], 0)
-			ass_row := model.ProjectAssignment{
-				ProjectID:  projID,
-				UserID:     m["user_id"].(int64),
-				Role:       role,
-				AssignedBy: &assignedBy,
-			}
-
-			if tx.Create(&ass_row).Error != nil {
-				return tx.Error
+		for _, assRow := range memberRows {
+			if !util.ProjectAssignmentInsert(tx, assRow.ProjectID, assRow.UserID, assRow.Role, assRow.AssignedBy) {
+				return errors.New("添加权限失败: 写入权限记录失败")
 			}
 		}
 		return nil
 	}) == nil {
-		util.SendJSON(c, 0, "添加权限成功", []gin.H{
-			{
-				"project_id": row.ID,
-				"name":       req.Data["name"],
-				"created_at": row.CreatedAt,
-			}}, 1, 1, c.FullPath(), c.Request.Method)
+		util.SendJSON(c, 0, "添加权限成功", []gin.H{{}}, len(memberRows), len(memberRows), c.FullPath(), c.Request.Method)
 	} else {
 		util.SendJSON(c, -1, "添加权限失败：添加数据失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
 		return

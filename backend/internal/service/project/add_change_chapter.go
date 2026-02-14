@@ -1,15 +1,120 @@
 package project
 
 import (
+	"errors"
+
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/config"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/model"
+	"github.com/SquareCatFirst/YouWangTranslation/backend/internal/util"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 func AddChangeChapter(c *gin.Context) {
-	// req, ok := util.ParseRequest(c)
-	// if !ok {
-	// 	util.SendJSON(c, -1, "操作章节失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
-	// 	return
-	// }
+	req, ok := util.ParseRequest(c)
+	if !ok {
+		util.SendJSON(c, -1, "操作章节失败：解析请求失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	}
+
+	if req.Action == "add" {
+		if req.Data["project_id"] == nil {
+			util.SendJSON(c, -1, "添加章节失败: 缺少项目ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		projID := util.GetInt64(req.Data, "project_id")
+		if config.DB.Where("id = ?", projID).First(&model.Project{}).Error != nil {
+			if config.DB.Where("id = ?", projID).First(&model.Project{}).Error == gorm.ErrRecordNotFound {
+				util.SendJSON(c, -1, "添加章节失败: 项目不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+		}
+
+		row := model.ProjectChapter{
+			ProjectID:   projID,
+			ChapterName: "未命名章节" + util.GenSN(),
+		}
+
+		if config.DB.Transaction(func(tx *gorm.DB) error {
+			if !util.ProjectChapterInsert(tx, projID, row.ChapterName, row.IsVisible) {
+				return errors.New("添加章节失败：添加数据失败")
+			}
+			return nil
+		}) == nil {
+			if err := config.DB.Where("project_id = ?", projID).Order("order_index desc, id desc").First(&row).Error; err != nil {
+				util.SendJSON(c, -1, "添加章节失败：读取新增章节失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+
+			util.NormProjChapter(projID)
+
+			project_chapters := []model.ProjectChapter{}
+			if err := config.DB.Where("project_id = ?", projID).Order("order_index asc").Find(&project_chapters).Select("image_url", "order_index").Error; err != nil {
+				project_chapters = []model.ProjectChapter{}
+			}
+
+			util.SendJSON(c, 0, "添加章节成功", []interface{}{
+				gin.H{
+					"chapter_id":       row.ID,
+					"chapter_name":     row.ChapterName,
+					"is_visible":       row.IsVisible,
+					"order_index":      row.OrderIndex,
+					"project_chapters": project_chapters,
+				},
+			}, 1, 1, c.FullPath(), c.Request.Method)
+			return
+		} else {
+			util.SendJSON(c, -1, "添加章节失败：添加数据失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		}
+	} else if req.Action == "change" {
+		if req.Data["chapter_id"] == nil {
+			util.SendJSON(c, -1, "修改章节失败: 缺少章节ID", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+			return
+		}
+		chapterID := util.GetInt64(req.Data, "chapter_id")
+		var row model.ProjectChapter
+		if config.DB.Where("id = ?", chapterID).First(&row).Error != nil {
+			if config.DB.Where("id = ?", chapterID).First(&model.ProjectChapter{}).Error == gorm.ErrRecordNotFound {
+				util.SendJSON(c, -1, "修改章节失败: 章节不存在", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+				return
+			}
+		}
+
+		projID := row.ProjectID
+		row.ChapterName = util.GetString(req.Data, "chapter_name")
+		row.IsVisible = util.GetBool(req.Data, "is_visible")
+
+		if config.DB.Transaction(func(tx *gorm.DB) error {
+			if tx.Model(&row).Select("ChapterName", "IsVisible").Updates(&row).Error != nil {
+				return tx.Error
+			}
+			return nil
+		}) == nil {
+			util.NormProjChapter(projID)
+
+			project_chapters := []model.ProjectChapter{}
+			if err := config.DB.Where("project_id = ?", projID).Order("order_index asc").Find(&project_chapters).Select("image_url", "order_index").Error; err != nil {
+				project_chapters = []model.ProjectChapter{}
+			}
+
+			util.SendJSON(c, 0, "修改章节成功", []interface{}{
+				gin.H{
+					"chapter_id":       chapterID,
+					"chapter_name":     row.ChapterName,
+					"is_visible":       row.IsVisible,
+					"order_index":      row.OrderIndex,
+					"project_chapters": project_chapters,
+				},
+			}, 1, 1, c.FullPath(), c.Request.Method)
+			return
+		} else {
+			util.SendJSON(c, -1, "修改章节失败：修改数据失败", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		}
+
+	} else {
+		util.SendJSON(c, -1, "操作章节失败: 操作类型不合法", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)
+		return
+	}
 
 	// if req.Data["action"] == nil {
 	// 	util.SendJSON(c, -1, "操作章节失败: 缺少操作类型", []interface{}{}, 0, 0, c.FullPath(), c.Request.Method)

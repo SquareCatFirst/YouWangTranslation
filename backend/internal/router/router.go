@@ -18,7 +18,8 @@ func InitRouter() *gin.Engine {
 	// 注册模块路由
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status": "ok",
+			"status": 0,
+			"msg":    "ok",
 		})
 	})
 

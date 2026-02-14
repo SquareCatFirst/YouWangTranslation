@@ -89,7 +89,7 @@ func GetProj(c *gin.Context) {
 	mp["project_chapters"] = []ProjectChapterDTO{}
 
 	var tags []model.ProjectTag
-	err = config.DB.Where("id = ?", projID).Find(&tags).Error
+	err = config.DB.Where("project_id = ?", projID).Find(&tags).Error
 	if err == nil {
 		for _, item := range tags {
 			mp["tags"] = append(mp["tags"].([]int64), item.TagID)
@@ -97,7 +97,7 @@ func GetProj(c *gin.Context) {
 	}
 
 	var ass []model.ProjectAssignment
-	err = config.DB.Where("id = ?", projID).Find(&ass).Error
+	err = config.DB.Where("project_id = ?", projID).Find(&ass).Error
 	if err == nil {
 		for _, item := range ass {
 
@@ -128,7 +128,7 @@ func GetProj(c *gin.Context) {
 	var chapters []model.ProjectChapter
 
 	var chapter_mp = map[int64]ProjectChapterDTO{}
-	err = config.DB.Where("id = ?", projID).Find(&chapters).Error
+	err = config.DB.Where("project_id = ?", projID).Find(&chapters).Error
 	if err == nil {
 		for _, item := range chapters {
 			chapter_ids = append(chapter_ids, item.ID)
@@ -141,7 +141,7 @@ func GetProj(c *gin.Context) {
 			}
 
 			var img []model.ChapterWorkImage
-			err = config.DB.Where("id = ?", item.ID).Find(&img).Error
+			err = config.DB.Where("chapter_id = ?", item.ID).Find(&img).Error
 			if err == nil {
 				for _, itm := range img {
 					dto := chapter_mp[item.ID] // 取出副本
@@ -165,7 +165,7 @@ func GetProj(c *gin.Context) {
 
 	for _, cid := range chapter_ids {
 		var row []model.ChapterAssignment
-		err := config.DB.Where("id = ?", cid).Find(&row).Error
+		err := config.DB.Where("chapter_id = ?", cid).Find(&row).Error
 		if err == nil {
 			for _, item := range row {
 
